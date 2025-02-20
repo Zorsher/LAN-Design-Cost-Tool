@@ -1,0 +1,2 @@
+from vsdx import VisioFile
+
