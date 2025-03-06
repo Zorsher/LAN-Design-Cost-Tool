@@ -6,14 +6,12 @@ INCH_TO_CM = 2.54
 
 
 def main():
-    visioFile = VisioFile("files/test.vsdx")
+    visioFile = VisioFile("files/domru.vsdx")
 
     # visioFile.page_connections()
     shapes = visioFile.get_shapes_by_name("Wall")
-    # for shape in shapes:
-    #     print(shape.relative_bounds)
     connects = visioFile.get_shapes_connections(shapes)
-    print(connects)
+    # print(connects)
 
 if __name__ == "__main__":
     main()
