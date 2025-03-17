@@ -1,17 +1,21 @@
-from visio import VisioFile
+from visio import VisioTool
+from classes import Floor
 from vsdx import Page, Shape
 
-# Константы для преобразования
-INCH_TO_CM = 2.54
-
-
 def main():
-    visioFile = VisioFile("files/test.vsdx")
+    visioFile = VisioTool("files/domru.vsdx")
+    print(visioFile.file.master_index.keys())
 
     # visioFile.page_connections()
     shapes = visioFile.get_shapes_by_name("Wall")
-    connects = visioFile.get_shapes_connections(shapes)
-    print(connects)
+    graph = visioFile.get_shapes_connections(shapes)
+
+    fl = Floor(graph)
+
+    # print(fl.rooms[0].items)
+
+    # dfs_stack(graph, "1.0:2.0")
+
 
 if __name__ == "__main__":
     main()

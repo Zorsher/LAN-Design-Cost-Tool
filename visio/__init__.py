@@ -1,1 +1,1 @@
-from .VisioFiles import VisioFile
+from .VisioFiles import VisioTool
