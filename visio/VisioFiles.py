@@ -3,7 +3,7 @@ from vsdx import VisioFile as VsdxFile, Shape, Page, Connect
 from jsonOperations import jsonOperations
 from networkx import Graph
 
-ROUND = 5
+ROUND = 2
 
 class VisioTool():
     """
@@ -116,6 +116,12 @@ class VisioTool():
 
                     previous_vertex_name = (previous_vertex[0], previous_vertex[1])
                     next_vertex_name = (next_vertex[0], next_vertex[1])
+
+                    # Let`s go gambling 
+                    # edge = self.find_edge_for_vertex(new_vertex, connects)
+                    
+                    # if edge is None:
+                    #     continue
 
                     # Если новая точка равна по x или y с предыдущей или следующей точкой, но при этом она находится вне них
                     if ((previous_vertex[0] == next_vertex[0] == new_vertex[0] and (new_vertex[1] < previous_vertex[1] or new_vertex[1] > next_vertex[1])) or
@@ -234,25 +240,34 @@ class VisioTool():
                 shapes[shape.master_page_ID].append(shape)
         return shapes
 
-    def find_edge_for_vertex(self, vertex: tuple, graph: dict | Graph):
+    def find_edge_for_vertex(self, vertex: tuple, graph: dict | Graph) -> tuple:
         """
         Находит ребро, которое пренадлежит вершине
         """
         if isinstance(graph, dict):
-            # Есть бескромпромиссный вариант переделать словарь в Graph
-            ...
+            # Есть бескомпромиссный вариант переделать словарь в Graph
+            edges = list(Graph(graph).edges)
         elif isinstance(graph, Graph):
-            edges = graph.edges
+            edges = list(graph.edges)
 
         for edge in edges:
             previous_vertex, next_vertex = edge
 
-            if previous_vertex[0] == next_vertex[0]:
-                ...
-            elif previous_vertex[1] == next_vertex[1]:
-                ...
-            else:
-                ...
+            if (
+                (previous_vertex[0] == next_vertex[0] == vertex[0] and min(previous_vertex[1], next_vertex[1]) <= vertex[1] <= max(previous_vertex[1], next_vertex[1])) or
+                (previous_vertex[1] == next_vertex[1] == vertex[1] and min(previous_vertex[0], next_vertex[0]) <= vertex[0] <= max(previous_vertex[0], next_vertex[0]))
+            ):
+                return edge
+
+            if previous_vertex[0] != next_vertex[0] and previous_vertex[1] != next_vertex[1]:
+                # Находим параметр t для x и y
+                t_x = (vertex[0] - previous_vertex[0]) / (next_vertex[0] - previous_vertex[0])                        
+                t_y = (vertex[1] - previous_vertex[1]) / (next_vertex[1] - previous_vertex[1])
+
+                if round(t_x, 1) == round(t_y, 1) and 0 <= t_x <= 1:
+                    return edge
+
+
 
 
 
