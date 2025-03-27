@@ -1,0 +1,127 @@
+QWidget{
+    background-color: rgba(30, 30, 30, 0.9);
+    margin: 1px;
+    border-radius: 5px;
+}
+
+#fileBackground {
+    border-radius: 15px;
+}
+
+QLabel {
+    background-color: rgba(0, 0, 0, 0.0);
+    color: rgb(240, 240, 240);
+}
+
+QLabel#mini {
+    font-size: 11px;
+}
+
+#red {
+    border: 1px solid darkred;
+}
+
+#green {
+    border: 1px solid darkgreen;
+}
+
+QPushButton {
+    font-size: 12px;
+    color: white;
+}
+
+QPushButton:hover {
+    background-color: dimgray;
+}
+
+QPushButton:disabled {
+    background-color: gray;
+    color: rgb(167, 167, 167);
+}
+
+#bold {
+    font-weight: bold;
+}
+
+QPushButton#file{
+    background-color: rgba(60, 60, 60, 0.8);
+    border-radius: 15px;
+}
+
+QScrollArea QWidget{
+    background-color: rgba(0, 0, 0, 0);
+}
+
+QScrollArea#Channel, 
+#darkertype1, 
+#darkertype2, 
+#darker,
+QComboBox QAbstractItemView {
+    background-color: rgba(40, 40, 40, 0.8);
+}
+
+#type0, #type1, #type2, #border, #darkertype1, #darkertype2 {
+    border-radius: 5px;
+}
+
+QWidget#inputarea #type0, 
+QWidget#inputarea #type1, 
+QWidget#inputarea #type2,
+QWidget#popup {
+    background-color: rgba(30, 30, 30, 0.9);
+}
+
+QScrollArea#Channel #type0, 
+QScrollArea#Channel #type1, 
+QScrollArea#Channel #type2,
+#fileBackground,
+QScrollBar::handle {
+    background-color: rgba(60, 60, 60, 0.8);
+}
+
+#type0 {
+    border: 0px solid rgba(0, 0, 0, 0);
+}
+
+#type1, #darkertype1 {
+    border: 1px solid rgb(100, 100, 100);
+}
+
+#type2, #darkertype2, QWidget#popup {
+    border: 1px solid rgb(80, 80, 80);
+}
+
+#border {
+    border: 2px solid rgb(120, 120, 120);
+}
+
+#zeroOpacity {
+    background-color: rgba(0, 0, 0, 0.0);
+}
+
+QLineEdit, QTextEdit, QTextBrowser{
+    border: 1px solid rgb(100, 100, 100);
+    color: white;
+}
+
+QScrollBar::sub-line, QScrollBar::add-line {
+    height: 0px;
+    width: 0px;
+}
+
+QScrollBar::sub-page, QScrollBar::add-page {
+    background-color: rgba(40, 40, 40, 0.8);
+}
+
+QScrollBar:vertical {
+    width: 10px;
+}
+
+QComboBox {
+    border: 1px solid rgb(100, 100, 100); 
+}
+
+QComboBox::item{
+    min-height: 40px;
+}
+

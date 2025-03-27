@@ -1,20 +1,34 @@
-from visio import VisioTool
+from utils import *
 from classes import Floor
 from vsdx import Page, Shape
+from gui import MainWindow, Application
 
 def main():
-    visioFile = VisioTool("files/domru.vsdx")
-    print(visioFile.file.master_index.keys())
+    import sys
+    tmp = TempFilesManager()
 
-    # visioFile.page_connections()
-    shapes = visioFile.get_shapes_by_name("Wall")
-    graph = visioFile.get_shapes_connections(shapes)
+    # visioFile = VisioTool("C:\\Users\\zorsher\\Desktop\\дипло\\files" + "\\" + "domru.vsdx")
+    # # print(visioFile.file.master_index.keys())
 
-    fl = Floor(graph)
+    # # visioFile.page_connections()
+    # shapes = visioFile.get_shapes_by_name("Wall")
+    # graph = visioFile.get_shapes_connections(shapes)
 
-    # print(fl.rooms[0].items)
+    # fl = Floor(graph)
+    # for room in fl.rooms:
+    #     visioFile.draw_graph_with_highlighted_edges(fl.G, room.graph.edges)
 
-    # dfs_stack(graph, "1.0:2.0")
+
+    app = Application([])
+
+    gui = MainWindow()
+    gui.show()
+
+    sys.exit(app.exec())
+
+
+
+    # fl = gui.fl
 
 
 if __name__ == "__main__":
