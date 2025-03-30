@@ -13,15 +13,17 @@ class Item():
     shape: Shape
     projecton: tuple
     distance: float
+    name: str
 
     def __init__(self, shape: Shape, projection: list, distance: float):
         self.tool = VisioTool()
         self.shape = shape
         self.projecton = projection
         self.distance = distance
+        self.name = self.tool.get_shape_name_by_id(self.shape.master_page_ID)
 
     def __repr__(self):
-        return f"Name: {self.tool.get_shape_name_by_id(self.shape.master_page_ID)}, ID: {self.shape.ID}, Original pos: {self.shape.center_x_y}, Projection: {self.projecton}"
+        return f"Name: {self.name}, ID: {self.shape.ID}, Original pos: {self.shape.center_x_y}, Projection: {self.projecton}"
 
 
 class Room():
@@ -30,17 +32,22 @@ class Room():
     status: str
     graph: Graph
     items: dict[str, list[Item]]
-    reference_node: tuple # Что если их несколько?
+    reference_nodes: list # Что если их несколько?
     additional_nodees: list[tuple]
     room_picture_path: str
-    full_leight: int = None
-    calculated_paths: tuple = None
+    full_leight: int = 0
+    final_nodes_leight: dict[tuple, int]
+    calculated_paths: list = None
+
 
     
     def __init__(self, graph: list, parent):
-        self.ID = uuid.uuid4()
         self.parent: Floor = parent
+        self.ID = uuid.uuid4()
         self.items = {}
+        self.final_nodes_leight = {}
+        self.reference_nodes = []
+        self.calculated_paths = []
         self.tool = VisioTool()
         self.graph = graph
 
@@ -64,50 +71,6 @@ class Room():
                 else:
                     self.items[key].append(item)
 
-    def has_server(self):
-        ID = self.tool.get_shape_id_by_name("Server")
-        return str(ID) in self.items
-            
-
-    # def find_paths_by_shapes_id(self, start_shape_id: int, end_shape_id: int):
-    #     """
-    #     Находит единый путь в заданном графе от начальных вершин до конечной вершины.
-    #     Для start_shape_id будут найдены все имеющиеся в графе вершины, которые соответствуют этому ID.
-
-    #     :param: start_shape_id: int - ID начальной вершины.
-    #     :param: end_shape_id: int - ID конечной вершины.
-    #     """
-
-    #     if str(start_shape_id) not in list(self.items.keys()) or str(end_shape_id) not in list(self.items.keys()):
-    #         return
-
-    #     start_nodees = [item.projecton for item in self.items[str(start_shape_id)]]
-    #     end_node = self.items[str(end_shape_id)][0].projecton
-
-    #     global_leight = 0
-    #     next_node = end_node
-    #     visited = [next_node]
-    #     paths = [(next_node, 0)]
-
-    #     for i in range(len(start_nodees)):
-    #         nearest_nodees = [(node, nx.dijkstra_path_length(self.graph, node, next_node)) for node in start_nodees if node not in visited]
-    #         nearest_nodees.sort(key = lambda items: items[-1])
-
-    #         nearest_node, nearest_leight = nearest_nodees[0]
-    #         end_leight = nx.dijkstra_path_length(self.graph, nearest_node, end_node)
-
-    #         if nearest_leight <= end_leight:
-    #             global_leight+= nearest_leight
-    #             leight = nearest_leight+paths[i][-1]
-    #         else:
-    #             global_leight+= end_leight
-    #             leight = end_leight
-
-    #         visited.append(nearest_node)
-    #         paths.append((nearest_node, leight))
-    #         next_node = nearest_node
-
-    #     # print(paths, global_leight)
 
     def find_paths_by_shapes_id(self, start_shape_id: int, end_shape_id: int):
         """
@@ -127,7 +90,6 @@ class Room():
         start_nodes = [item.projecton for item in start_items]
         end_node = end_item.projecton
 
-        # соотнести пути с фигурами
         paths, leight = self.tool.find_minimum_paths_in_graph(self.graph, start_nodes, end_node)
 
         start_items.append(end_item)
@@ -135,10 +97,12 @@ class Room():
         for path in paths:
             node = path[0]
             for item in start_items:
-                if item.projecton == node:
-                    paths[paths.index(path)][0] = item
-                    start_items.remove(item)
-                    break
+                if item.projecton != node:
+                    continue
+
+                paths[paths.index(path)][0] = item
+                start_items.remove(item)
+                break
 
         return paths, leight
 
@@ -149,10 +113,12 @@ class Floor():
     ID: int
     rooms: list[Room] = []
     corridor_rooms: list[Room] = []
+    area: float
 
     def __init__(self, graph):
         self.tool = VisioTool()
         self.graph = graph
+        self.area = 0.0
 
         self.G = nx.Graph()
         for node, neighbors in self.graph.items():
@@ -162,22 +128,22 @@ class Floor():
 
         for room in nx.minimum_cycle_basis(self.G):
             room_graph = nx.Graph()
-            for i in range(len(room)):
-                room_graph.add_edge(room[i], room[i - 1], weight=self.G[room[i]][room[i - 1]]["weight"])
+            len_room = len(room)
+            area = 0
 
-            # self.tool.draw_graph_with_highlighted_edges(self.G, room_graph.edges)
+            for i in range(len_room):
+                area += room[i][0] * room[(i + 1) % len_room][1] - room[(i + 1) % len_room][0] * room[i][1]
+                room_graph.add_edge(room[i], room[(i + 1) % len_room], weight=self.G[room[i]][room[(i + 1) % len_room]]["weight"])
+
+            print(abs(area*0.5))
+
+            self.area+=(abs(area*0.5)*0.00064516)
+
             room = Room(room_graph, self)
-
-            # room.room_picture_path = path
-
-            # if room.items
-
-            # room.find_paths_by_shapes_id(9, 10)
-            # print("=========")
-            # print(room_graph.edges) 
-            # print(room.items)
             self.rooms.append(room)
 
+
+        print(self.area)
     def find_outside_paths(self, outside_items):
         print(outside_items)
 

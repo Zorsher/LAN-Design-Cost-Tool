@@ -3,3 +3,4 @@ from .Button import PushButton, HoldButton
 from .Dialog import PopupDialog
 from .ScrollArea import ScrollArea
 from .TextEdits import MessageInput
+from .Picture import PictureWidget

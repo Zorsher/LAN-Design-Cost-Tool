@@ -10,6 +10,7 @@ from vsdx import Shape, Page
 from networkx import Graph
 
 ROUND = 2
+INCH_TO_CM = 2.54
 
 class VisioTool():
     """
@@ -17,7 +18,7 @@ class VisioTool():
     """
     _isinstance = None
     _shapes_loaded = False
-    master_shapes: dict
+    master_shapes: dict[int, tuple[Page, str]]
 
     def __new__(cls, file_path: str = None):
         if cls._isinstance is None:
@@ -351,11 +352,14 @@ class VisioTool():
         global_leight = 0
         next_node = end_node
         visited = [next_node]
-        paths = [(next_node, 0)]
+        paths = [[next_node, 0]]
 
         for i in range(len(start_nodes)):
-            nearest_nodees = [(node, nx.dijkstra_path_length(graph, node, next_node)) for node in start_nodes if node not in visited]
+            nearest_nodees = [[node, nx.dijkstra_path_length(graph, node, next_node)] for node in start_nodes if node not in visited]
             nearest_nodees.sort(key = lambda items: items[-1])
+
+            if len(nearest_nodees) == 0:
+                break
 
             nearest_node, nearest_leight = nearest_nodees[0]
             end_leight = nx.dijkstra_path_length(graph, nearest_node, end_node)
@@ -368,10 +372,30 @@ class VisioTool():
                 leight = end_leight
 
             visited.append(nearest_node)
-            paths.append((nearest_node, leight))
+            paths.append([nearest_node, leight])
             next_node = nearest_node
 
         return paths, global_leight
+    
+    def get_minimum_distance_to_graph_nodes(self, graph: Graph, start_node: tuple, graph_nodes: list):
+        edge = self.find_edge_for_node(start_node, graph)
+
+        min_edge_nodes_paths = []
+
+        for node in edge:
+            path = math.dist(start_node, node) * INCH_TO_CM
+
+            min_path_to_graph_node = [[graph_node, nx.dijkstra_path_length(graph, node, graph_node)] for graph_node in graph_nodes if graph_node in graph.nodes]
+            min_path_to_graph_node.sort(key = lambda items: items[-1])
+
+            nearest_node, nearest_leight = min_path_to_graph_node[0]
+            min_edge_nodes_paths.append((nearest_node, path+nearest_leight))
+
+        min_edge_nodes_paths.sort(key = lambda items: items[-1])
+
+        return min_edge_nodes_paths[0]
+
+
     
     def draw_graph(self, graph: Graph, colors: list = "black", debug: bool = False) -> str: # так называемый дебаг
         tmp = TempFilesManager()

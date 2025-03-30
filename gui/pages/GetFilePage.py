@@ -12,6 +12,7 @@ class GetFilesWidget(QtWidgets.QWidget):
         self.core_layout = QtWidgets.QVBoxLayout()
 
         self.label = QtWidgets.QLabel("Добавьте ваш файл")
+        self.label.setObjectName("bold")
 
         self.add_file = PushButton("Добавить файл")
         self.add_file.setFixedHeight(30)

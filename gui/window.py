@@ -1,8 +1,12 @@
 from PySide6 import QtCore, QtGui, QtWidgets
 from utils import TempFilesManager, VisioTool
 from .pages import GetFilesWidget, ElementsTreeWidget, RoomsStatusWidget, ResultsWidget
-from classes import Floor
+from classes import Floor, Room
 from vsdx import Shape, Page
+import math
+import networkx as nx
+
+INCH_TO_CM = 2.54
 
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
@@ -61,7 +65,6 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.third_page.load_page(self.floor, self.inside_items, self.outside_items)
 
             case 3:
-                print("in", self.inside_items)
                 items = {}
                 for index in range(len(self.outside_items) - 1):
                     if index % 2 == 1:
@@ -72,10 +75,19 @@ class MainWindow(QtWidgets.QMainWindow):
                     if next_item in items:
                         items[next_item].append(self.outside_items[index])
                     else:
-                        items[next_item] = self.outside_items[index]
+                        items[next_item] = [self.outside_items[index]]
+
+                corridors: set[tuple] = set()
 
                 for room in self.floor.rooms:
+                    # if room.status == 0 or room.status == 3:
+                    #     continue
+
+                    if room.status == 2:
+                        corridors.update(room.graph.nodes)
+
                     for index in range(len(self.inside_items) - 1):
+                        print(room.name)
                         if index % 2 == 1:
                             continue
 
@@ -86,15 +98,69 @@ class MainWindow(QtWidgets.QMainWindow):
                         if data is None:
                             continue
 
+                        
                         paths, leight = data
 
-                        room.calculated_paths = paths
-                        room.full_leight = leight
+                        room.calculated_paths.append(paths)
+                        room.full_leight+=leight
 
-                for room in self.floor.rooms:
-                    print(room.calculated_paths, room.full_leight)
+                for reference_shape, connected_shapes in items.items():
+                    print("ПРИВЕТ Я ТУТ Я НЕ МОГУ БЫТЬ НЕ ТУТ!")
+
+                    final_node, final_leight = [
+                        self.tool.get_minimum_distance_to_graph_nodes(
+                            self.floor.G,
+                            room.items[reference_shape.page_id][0].projecton,
+                            list(corridors)
+                        ) 
+
+                        for room in self.floor.rooms 
+                        if reference_shape.page_id in room.items
+                        ][0] # вопросы?
+                    
+                    for connected_shape in connected_shapes:
+                        # print(connected_shapes)
+                        rooms_nodes: dict[str, list[Room]] = {}
+                        
+                        for room in self.floor.rooms:
+                            if connected_shape.page_id not in room.items:
+                                continue
+
+                            room_node, room_leight = self.tool.get_minimum_distance_to_graph_nodes(self.floor.G, room.items[connected_shape.page_id][0].projecton, list(corridors))
+
+                            room.final_nodes_leight[(reference_shape.page_id, connected_shape.page_id)] = (room_leight + final_leight)
+
+                            if room_node not in rooms_nodes:
+                                rooms_nodes[room_node] = [room]
+                            else:
+                                rooms_nodes[room_node].append(room)
 
 
+                        print("con sh", connected_shape)
+                        # its over...
+                        nodes, global_path = self.tool.find_minimum_paths_in_graph(self.floor.G, list(rooms_nodes.keys()), final_node)
+
+                        for room in self.floor.rooms:
+                            if room.status != 2:
+                                continue
+
+                            room.calculated_paths.append(nodes)
+                            room.full_leight = global_path
+
+                        for node, path_leight in nodes:
+                            if path_leight == 0:
+                                continue
+
+                            for room in rooms_nodes[node]:
+                                room.final_nodes_leight[(reference_shape.page_id, connected_shape.page_id)] += path_leight
+                                # print(room.full_leight, room.final_nodes_leight)
+
+
+                
+                # for room in self.floor.rooms:
+                #     print(room.name, room.calculated_paths, room.full_leight, room.final_nodes_leight)
+
+                self.fourth_page.load_page(self.floor)
                 self.central_stacked_layout.setCurrentIndex(3)
 
 

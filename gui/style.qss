@@ -117,7 +117,7 @@ QScrollBar:vertical {
     width: 10px;
 }
 
-QComboBox {
+QComboBox, #combo {
     border: 1px solid rgb(100, 100, 100); 
 }
 

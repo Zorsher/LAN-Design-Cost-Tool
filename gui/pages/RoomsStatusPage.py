@@ -36,7 +36,7 @@ class RoomsStatusWidget(QtWidgets.QWidget):
 
             self.room_status = QtWidgets.QComboBox()
             self.room_status.addItems(
-                ["Отсутствует", "Комната", "Кордиор", "Игнорировать комнату"])
+                ["Отсутствует", "Комната", "Коридор", "Игнорировать комнату"])
             self.room_status.currentTextChanged.connect(self.room_status_changed)
             
             self.room_status_layout.addStretch()
@@ -60,7 +60,7 @@ class RoomsStatusWidget(QtWidgets.QWidget):
 
         def room_status_changed(self):
             current_index = self.room_status.currentIndex()
-            self.room.name = self.room_status.currentText()
+            self.room.status = self.room_status.currentIndex()
             
             if current_index != 2 and self.previous_status != 2:
                 return
@@ -153,6 +153,7 @@ class RoomsStatusWidget(QtWidgets.QWidget):
 
         for index, room in enumerate(self.floor.rooms):
             room_widget = RoomsStatusWidget.RoomWidget(room, inside_items, outside_items)
+            room_widget.room_name.setPlaceholderText(f"Комната {index}")
             room_widget.room_name.setText(f"Комната {index}")
             self.rooms_list.append(room_widget)
             self.rooms_layout.addWidget(room_widget)
