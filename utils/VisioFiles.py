@@ -10,7 +10,7 @@ from vsdx import Shape, Page
 from networkx import Graph
 
 ROUND = 2
-INCH_TO_CM = 2.54
+INCH_TO_M = 0.0254
 
 class VisioTool():
     """
@@ -42,10 +42,36 @@ class VisioTool():
         if self._shapes_loaded:
             return
 
-        self.master_shapes = {}
         self._shapes_loaded = True
-        for shape in self.file.master_index.values():
-            # print(shape.page_id, "ya tut")
+        self.master_shapes = {}
+        items = self.com_file.Masters.GetNames()
+
+        existing_items = set()
+
+        # как это ускорить?
+        for page in self.com_file.Pages:
+            for shape in page.Shapes:
+                try:
+                    master_id = shape.Master.ID
+                except:
+                    continue
+
+                existing_items.add(master_id) if master_id not in existing_items else None
+
+
+        # произошла локализация
+        for shape, com_shape in zip(self.file.master_pages, items):
+            if int(shape.page_id) not in existing_items:
+                continue
+
+            name = str(com_shape)
+
+            try:
+                name = name.split(".")[0]
+            except:
+                ...
+
+            shape.name = name # Я ИЗМЕНИЛ ОСНОВНУЮ БИБЛИОТЕКУ АЛЯРМ!
             path = self.save_shape_in_new_file(shape.page_id)
             self.master_shapes[shape.page_id] = (shape, path)
 
@@ -80,9 +106,12 @@ class VisioTool():
         """
         Получить имя фигуры по ID
         """
-        for key, value in self.file.master_index.items():
-            if int(value.page_id) == int(id):
-                return key
+        try:
+            for key, value in self.file.master_index.items():
+                if int(value.page_id) == int(id):
+                    return key
+        except Exception as e:
+            ...
 
     def get_shapes_intersection(self, first_shape: Shape, second_shape: Shape):
         """
@@ -114,21 +143,14 @@ class VisioTool():
         """
         connects = {}
         for shape in shapes:
-            _x1, _y1, _x2, _y2 = shape.bounds
-            bounds = ((min(_x1, _x2), min(_y1, _y2), max(_x1, _x2), max(_y1, _y2)))
-            x1, y1, x2, y2 = (round(bound, ROUND) for bound in bounds)
+            # _x1, _y1, _x2, _y2 = shape.bounds
+            # bounds = ((min(_x1, _x2), min(_y1, _y2), max(_x1, _x2), max(_y1, _y2)))
+            x1, y1, x2, y2 = (round(bound, ROUND) for bound in shape.bounds)
 
-            dist = round(math.dist([x1, y1], [x2, y2]), ROUND)
+            dist = math.dist([x1, y1], [x2, y2])
             
-            if (x1, y1) not in connects:
-                connects[(x1, y1)] = {(x2, y2): dist}
-            else:
-                connects[(x1, y1)][(x2, y2)] = dist
-
-            if (x2, y2) not in connects:
-                connects[(x2, y2)] = {(x1, y1): dist}
-            else:
-                connects[(x2, y2)][(x1, y1)] = dist
+            connects.setdefault((x1, y1), {})[(x2, y2)] = dist
+            connects.setdefault((x2, y2), {})[(x1, y1)] = dist
 
             intersections = [(x2, y2), (x1, y1)]
 
@@ -169,16 +191,16 @@ class VisioTool():
                     connects[previous_node].pop(next_node)
                     connects[next_node].pop(previous_node)
 
-                    previous_new_dist = round(math.dist(previous_node, new_node), ROUND)
-                    next_new_dist = round(math.dist(next_node, new_node), ROUND)
+                    previous_new_dist = math.dist(previous_node, new_node)
+                    next_new_dist = math.dist(next_node, new_node)
 
                     connects[previous_node].update({new_node: previous_new_dist})
                     connects[next_node].update({new_node: next_new_dist})
 
-                    if new_node not in list(connects.keys()):
-                        connects[new_node] = {previous_node: previous_new_dist, next_node: next_new_dist}
-                    else:
-                        connects[new_node].update({previous_node: previous_new_dist, next_node: next_new_dist})
+                    connects.setdefault(new_node, {}).update({
+                        previous_node: previous_new_dist,
+                        next_node: next_new_dist
+                    })
 
                     break
 
@@ -211,15 +233,17 @@ class VisioTool():
             a_x, a_y = n_x - p_x, n_y - p_y
             b_x, b_y = x - p_x, y - p_y
 
-            t = ((a_x * b_x) + (a_y * b_y)) / ((a_x ** 2) + (a_y ** 2))
+            try:
+                t = ((a_x * b_x) + (a_y * b_y)) / ((a_x ** 2) + (a_y ** 2))
+            except Exception as e:
+                t = 0
 
             if 0 > round(t, ROUND) or 1 < round(t, ROUND):
                 continue
 
             node = (p_x + t * a_x, p_y + t * a_y)
 
-            distance = round(math.dist((x, y), node), ROUND)
-            # print(previous_node, node, next_node, distance)
+            distance = math.dist((x, y), node)*INCH_TO_M
             distances.append(((round(node[0], ROUND), round(node[1], ROUND)), previous_node, next_node, distance))
 
 
@@ -230,7 +254,7 @@ class VisioTool():
 
         return distances[0]
         
-    def get_shapes_inside_polygon(self, polygon_node: list[tuple] | Graph, page: int = 0) -> dict[str, list[Shape]]:
+    def get_shapes_inside_polygon(self, wall_shape: Page, polygon_node: list[tuple] | Graph, page: int = 0) -> dict[str, list[Shape]]:
         """
         Определяет все фигуры внутри многоугольника
         """
@@ -239,11 +263,10 @@ class VisioTool():
 
         if isinstance(polygon_node, Graph):
             polygon_node = list(nx.minimum_cycle_basis(polygon_node))[0]
-            # print(polygon_node)
 
         for shape in all_shapes:
             # добавить whitelist для фигур, которые нужно учитывать
-            if shape.master_page_ID == self.file.master_index["Wall"].page_id:
+            if shape.master_page_ID == wall_shape.page_id:
                 continue
 
             x, y = shape.center_x_y
@@ -262,7 +285,8 @@ class VisioTool():
                 if x > max(previous_node[0], next_node[0]):
                     continue
 
-                x_intersection = previous_node[0] + (y - previous_node[1]) * ((next_node[0] - previous_node[0]) / (next_node[1] - previous_node[1]))
+                # x_intersection = previous_node[0] + (y - previous_node[1]) * ((next_node[0] - previous_node[0]) / (next_node[1] - previous_node[1]))
+                x_intersection = previous_node[0] + (next_node[0] - previous_node[0]) * ((y - previous_node[1]) / (next_node[1] - previous_node[1]))
                 
                 if x_intersection > x:
                     intersections+=1
@@ -270,10 +294,7 @@ class VisioTool():
             if intersections == 0 or intersections % 2 == 0:
                 continue
 
-            if shape.master_page_ID not in shapes:
-                shapes[shape.master_page_ID] = [shape]
-            else:
-                shapes[shape.master_page_ID].append(shape)
+            shapes.setdefault(shape.master_page_ID, []).append(shape)
         return shapes
 
     def find_edge_for_node(self, node: tuple, graph: dict | Graph) -> tuple:
@@ -287,7 +308,7 @@ class VisioTool():
             G = nx.Graph()
             for node, neighbors in graph.items():
                 for neighbor, weight in neighbors.items():
-                    G.add_edge(node, neighbor, weight=round(weight))
+                    G.add_edge(node, neighbor, weight=weight)
             edges = list(G.edges)
         elif isinstance(graph, Graph):
             edges = list(graph.edges)
@@ -350,12 +371,12 @@ class VisioTool():
         """
         
         global_leight = 0
-        next_node = end_node
-        visited = [next_node]
-        paths = [[next_node, 0]]
+        previous_node = end_node
+        visited = [previous_node]
+        paths = [[previous_node, 0]]
 
         for i in range(len(start_nodes)):
-            nearest_nodees = [[node, nx.dijkstra_path_length(graph, node, next_node)] for node in start_nodes if node not in visited]
+            nearest_nodees = [[node, nx.dijkstra_path_length(graph, node, previous_node)] for node in start_nodes if node not in visited]
             nearest_nodees.sort(key = lambda items: items[-1])
 
             if len(nearest_nodees) == 0:
@@ -373,7 +394,7 @@ class VisioTool():
 
             visited.append(nearest_node)
             paths.append([nearest_node, leight])
-            next_node = nearest_node
+            previous_node = nearest_node
 
         return paths, global_leight
     
@@ -383,7 +404,7 @@ class VisioTool():
         min_edge_nodes_paths = []
 
         for node in edge:
-            path = math.dist(start_node, node) * INCH_TO_CM
+            path = math.dist(start_node, node) * INCH_TO_M
 
             min_path_to_graph_node = [[graph_node, nx.dijkstra_path_length(graph, node, graph_node)] for graph_node in graph_nodes if graph_node in graph.nodes]
             min_path_to_graph_node.sort(key = lambda items: items[-1])

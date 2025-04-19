@@ -4,6 +4,8 @@ from classes import Floor, Room, Item
 from utils import VisioTool
 import math
 
+INCH_TO_M = 0.0254
+
 class ResultsWidget(QtWidgets.QWidget):
     area_changed = QtCore.Signal(object)
     class RoomResults(QtWidgets.QVBoxLayout):
@@ -44,10 +46,13 @@ class ResultsWidget(QtWidgets.QWidget):
                             master_item = item
                             master_path = path
                             continue
-                        
-                        _l = leight
 
-                        leight = math.ceil(leight*multiplier / 100)
+                        leight = math.ceil(leight*multiplier)
+                        # master_item_leight = math.dist(master_item.distance*multiplier)
+                        item_leight = math.ceil(item.distance*multiplier)
+
+                        master_item.distance = math.dist(master_item.projecton, master_item.shape.center_x_y)*INCH_TO_M
+                        master_item_leight = math.ceil(master_item.distance*multiplier)
 
                         # print(f"{_l}*{multiplier}/100 = {leight}")
                         sum_leight+=leight
@@ -59,9 +64,9 @@ class ResultsWidget(QtWidgets.QWidget):
 
                         # leight_label = QtWidgets.QLabel(f"{leight}")
 
-                        connection_items_layout.addWidget(QtWidgets.QLabel(f"Путь от элемента {master_item.name}"))
+                        connection_items_layout.addWidget(QtWidgets.QLabel(f"Путь от элемента {master_item.name} ({master_item_leight} м.)"))
                         connection_items_layout.addWidget(master_icon)
-                        connection_items_layout.addWidget(QtWidgets.QLabel(f"к элементу {item.name}"))
+                        connection_items_layout.addWidget(QtWidgets.QLabel(f"к элементу {item.name} ({item_leight} м.)"))
                         connection_items_layout.addWidget(icon)
                         connection_items_layout.addWidget(QtWidgets.QLabel(f"за расстояние: {leight} м."))
                         # connection_items_layout.addWidget(leight_label)
@@ -70,8 +75,6 @@ class ResultsWidget(QtWidgets.QWidget):
                         self.core_layout.addLayout(connection_items_layout)
                     except Exception as e:
                         continue
-
-
 
             for shapes_ids, leight in room.final_nodes_leight.items():
                 connection_layout = QtWidgets.QHBoxLayout()
@@ -82,10 +85,8 @@ class ResultsWidget(QtWidgets.QWidget):
                 start_icon = PictureWidget(start_shape_picture_path, QtCore.QSize(30, 30))
                 end_icon = PictureWidget(end_shape_picture_path, QtCore.QSize(30, 30))
 
-                _l = leight
-
-                leight = math.ceil(leight*multiplier / 100)
-                # print(f"{_l}*{multiplier}/100 = {leight}")
+                leight = math.ceil(leight*multiplier)
+                room.parent.full_leight+=leight
                 # final_nodes_leight_label = QtWidgets.QLabel(f"{leight}")
 
                 connection_layout.addWidget(QtWidgets.QLabel(f"Путь от начального элемента {start_shape.name}"))
@@ -100,6 +101,7 @@ class ResultsWidget(QtWidgets.QWidget):
 
             if sum_leight != 0:
                 sum_leight = math.ceil(sum_leight)
+                room.parent.full_leight+=sum_leight if room.status != 0 or room.status != 2 else 0
                 self.sum_leight_layout = QtWidgets.QHBoxLayout()
                 # self.sum_leight_label = QtWidgets.QLabel(f"{sum_leight}")
 
@@ -108,11 +110,12 @@ class ResultsWidget(QtWidgets.QWidget):
                 self.sum_leight_layout.addStretch()
                 self.core_layout.addLayout(self.sum_leight_layout)
 
+
             self.full_leight_layout = QtWidgets.QHBoxLayout()
 
-            room_leight = math.ceil(room.full_leight * multiplier / 100)
+            room_leight = math.ceil(room.full_leight * multiplier)
 
-            print(room.calculated_paths, f"{room.full_leight}*{multiplier}/100 = {room_leight}")
+            # print(f"{room.full_leight}*{multiplier}/100 = {room_leight}")
             # self.full_leight_label = QtWidgets.QLabel(f"{room_leight}")
             
             self.full_leight_layout.addWidget(QtWidgets.QLabel(f"Длина уникального пути внутри помещения: {room_leight} м."))
@@ -186,12 +189,13 @@ class ResultsWidget(QtWidgets.QWidget):
             return
 
         self.multiplier = math.sqrt(area / self.floor.area)
-        print(f"{self.multiplier} = sqrt({area} / {self.floor.area})")
+        # print(f"{self.multiplier} = sqrt({area} / {self.floor.area})")
 
 
         
     def load_page(self, floor: Floor):
         self.floor = floor
+        self.floor_area_input.setPlaceholderText(f"{self.floor.area*10000}".split(".")[0]) # почему нет?
 
     def show_results(self):
         self.stacked_layout.setCurrentIndex(1)
@@ -204,3 +208,13 @@ class ResultsWidget(QtWidgets.QWidget):
 
             room_results = ResultsWidget.RoomResults(room, self.multiplier)
             self.scroll_area.addWidget(room_results)
+
+
+        final_leight_label = QtWidgets.QLabel(f"ИТОГО: {self.floor.full_leight} + 5% = {math.ceil(self.floor.full_leight+(self.floor.full_leight*0.05))} м.")
+        final_leight_label.setObjectName("bold")
+
+        final_leight_layout = QtWidgets.QHBoxLayout()
+        final_leight_layout.addSpacing(9)
+        final_leight_layout.addWidget(final_leight_label)
+
+        self.scroll_area.addWidget(final_leight_layout)

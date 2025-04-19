@@ -3,10 +3,8 @@ from utils import TempFilesManager, VisioTool
 from .pages import GetFilesWidget, ElementsTreeWidget, RoomsStatusWidget, ResultsWidget
 from classes import Floor, Room
 from vsdx import Shape, Page
-import math
-import networkx as nx
 
-INCH_TO_CM = 2.54
+INCH_TO_M = 0.0254
 
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
@@ -40,6 +38,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 try:
                     self.tool = VisioTool(data)
                 except Exception as e:
+                    print(e)
+                    self.tool._shapes_loaded = False
                     # self.tool._isinstance = None
                     self.first_page.file_denied.emit()
                     return
@@ -60,12 +60,13 @@ class MainWindow(QtWidgets.QMainWindow):
                 shapes = self.tool.get_shapes_by_id(wall_shape.page_id)
                 graph = self.tool.get_shapes_connections(shapes)
 
-                self.floor = Floor(graph)
+                self.floor = Floor(graph, wall_shape)
 
                 self.third_page.load_page(self.floor, self.inside_items, self.outside_items)
 
             case 3:
                 items = {}
+                # создание словаря мастер фигур объеденяющихся вне комнаты
                 for index in range(len(self.outside_items) - 1):
                     if index % 2 == 1:
                         continue
@@ -79,15 +80,13 @@ class MainWindow(QtWidgets.QMainWindow):
 
                 corridors: set[tuple] = set()
 
+                # расчёт всех соединений в комнате
                 for room in self.floor.rooms:
-                    # if room.status == 0 or room.status == 3:
-                    #     continue
-
                     if room.status == 2:
                         corridors.update(room.graph.nodes)
 
                     for index in range(len(self.inside_items) - 1):
-                        print(room.name)
+                        # print(room.name)
                         if index % 2 == 1:
                             continue
 
@@ -98,15 +97,14 @@ class MainWindow(QtWidgets.QMainWindow):
                         if data is None:
                             continue
 
-                        
                         paths, leight = data
+                        # print("papapaths", paths)
 
                         room.calculated_paths.append(paths)
                         room.full_leight+=leight
 
                 for reference_shape, connected_shapes in items.items():
-                    print("ПРИВЕТ Я ТУТ Я НЕ МОГУ БЫТЬ НЕ ТУТ!")
-
+                    # определение конечной вершины
                     final_node, final_leight = [
                         self.tool.get_minimum_distance_to_graph_nodes(
                             self.floor.G,
@@ -122,11 +120,14 @@ class MainWindow(QtWidgets.QMainWindow):
                         # print(connected_shapes)
                         rooms_nodes: dict[str, list[Room]] = {}
                         
+                        # поиск близжайшего расстояния фигур к вершнам многоугольнка коридора
                         for room in self.floor.rooms:
                             if connected_shape.page_id not in room.items:
                                 continue
 
-                            room_node, room_leight = self.tool.get_minimum_distance_to_graph_nodes(self.floor.G, room.items[connected_shape.page_id][0].projecton, list(corridors))
+                            item = room.items[connected_shape.page_id][0]
+
+                            room_node, room_leight = self.tool.get_minimum_distance_to_graph_nodes(self.floor.G, item.projecton, list(corridors))
 
                             room.final_nodes_leight[(reference_shape.page_id, connected_shape.page_id)] = (room_leight + final_leight)
 
@@ -135,10 +136,10 @@ class MainWindow(QtWidgets.QMainWindow):
                             else:
                                 rooms_nodes[room_node].append(room)
 
-
-                        print("con sh", connected_shape)
+                        # поиск путей внутри вершин коридора
                         # its over...
                         nodes, global_path = self.tool.find_minimum_paths_in_graph(self.floor.G, list(rooms_nodes.keys()), final_node)
+                        # print(nodes, global_path)
 
                         for room in self.floor.rooms:
                             if room.status != 2:
@@ -147,6 +148,7 @@ class MainWindow(QtWidgets.QMainWindow):
                             room.calculated_paths.append(nodes)
                             room.full_leight = global_path
 
+                        # добавление длины пути к каждому типу соединения
                         for node, path_leight in nodes:
                             if path_leight == 0:
                                 continue
@@ -162,11 +164,6 @@ class MainWindow(QtWidgets.QMainWindow):
 
                 self.fourth_page.load_page(self.floor)
                 self.central_stacked_layout.setCurrentIndex(3)
-
-
-
-
-
 
     def resizeEvent(self, event):
         self.central_widget.setFixedSize(event.size())

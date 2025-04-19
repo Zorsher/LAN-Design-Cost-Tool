@@ -1,12 +1,11 @@
 import math
 import uuid
-import matplotlib.pyplot as plt
 import networkx as nx
-from vsdx import Shape
+from vsdx import Shape, Page
 from utils import VisioTool
 from networkx import Graph
 
-INCH_TO_CM = 2.54
+INCH_TO_M = 0.0254
 ROUND = 2
 
 class Item():
@@ -53,7 +52,7 @@ class Room():
 
         self.room_picture_path = self.tool.save_graph_with_highlighted_edges(str(self.ID), parent.G, self.graph.edges)
 
-        shapes_inside = self.tool.get_shapes_inside_polygon(self.graph)
+        shapes_inside = self.tool.get_shapes_inside_polygon(parent.wall_shape, self.graph)
         # print(self.graph.edges)
 
         for key, values in shapes_inside.items():
@@ -63,8 +62,8 @@ class Room():
                 item = Item(value, projection, distance)
 
                 self.graph.remove_edge(previous_node, next_node)
-                self.graph.add_edge(previous_node, projection, weight=round(math.dist(previous_node, projection) * INCH_TO_CM, ROUND))
-                self.graph.add_edge(next_node, projection, weight=round(math.dist(projection, next_node) * INCH_TO_CM, ROUND))
+                self.graph.add_edge(previous_node, projection, weight=math.dist(previous_node, projection) * INCH_TO_M)
+                self.graph.add_edge(next_node, projection, weight=math.dist(projection, next_node) * INCH_TO_M)
 
                 if key not in self.items:
                     self.items[key] = [item]
@@ -97,6 +96,7 @@ class Room():
         for path in paths:
             node = path[0]
             for item in start_items:
+                item.name = VisioTool().master_shapes[item.shape.master_page_ID][0].name
                 if item.projecton != node:
                     continue
 
@@ -114,17 +114,20 @@ class Floor():
     rooms: list[Room] = []
     corridor_rooms: list[Room] = []
     area: float
+    wall_shape: Page
+    full_leight: int = 0
 
-    def __init__(self, graph):
+    def __init__(self, graph, wall_shape):
         self.tool = VisioTool()
         self.graph = graph
-        self.area = 0.0
+        self.wall_shape = wall_shape
 
         self.G = nx.Graph()
         for node, neighbors in self.graph.items():
             for neighbor, weight in neighbors.items():
-                self.G.add_edge(node, neighbor, weight = round(weight * INCH_TO_CM, 5))
+                self.G.add_edge(node, neighbor, weight = weight * INCH_TO_M)
 
+        self.area = 0.0
 
         for room in nx.minimum_cycle_basis(self.G):
             room_graph = nx.Graph()
@@ -135,12 +138,17 @@ class Floor():
                 area += room[i][0] * room[(i + 1) % len_room][1] - room[(i + 1) % len_room][0] * room[i][1]
                 room_graph.add_edge(room[i], room[(i + 1) % len_room], weight=self.G[room[i]][room[(i + 1) % len_room]]["weight"])
 
-            print(abs(area*0.5))
+            print(abs(area)*0.00064516)
 
-            self.area+=(abs(area*0.5)*0.00064516)
+            area = abs(area)
+
+            self.area+=(area*0.00064516)
 
             room = Room(room_graph, self)
             self.rooms.append(room)
+
+        self.area*=0.5
+        
 
 
         print(self.area)
