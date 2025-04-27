@@ -6,7 +6,7 @@ import os
 
 from utils.TempFile import TempFilesManager
 from vsdx import VisioFile as VsdxFile
-from vsdx import Shape, Page
+from vsdx import Shape, Page, Connect
 from networkx import Graph
 
 ROUND = 2
@@ -120,98 +120,138 @@ class VisioTool():
         f_x1, f_y1, f_x2, f_y2 = (round(bound, ROUND) for bound in first_shape.bounds)
         s_x1, s_y1, s_x2, s_y2 = (round(bound, ROUND) for bound in second_shape.bounds)
 
-        f_x1, f_y1, f_x2, f_y2 = (min(f_x1, f_x2), min(f_y1, f_y2), max(f_x1, f_x2), max(f_y1, f_y2))
-        s_x1, s_y1, s_x2, s_y2 = (min(s_x1, s_x2), min(s_y1, s_y2), max(s_x1, s_x2), max(s_y1, s_y2))
+        EPS = 1e-8  # или 1e-8, если погрешности большие
 
-        if f_x1 == f_x2 and s_x1 <= f_x1 <= s_x2:
-            if (f_y1 <= s_y1 <= f_y2):
-                return (f_x1, s_y1), (s_x2, s_y2)
-                
-            elif (f_y1 <= s_y2 <= f_y2):
-                return (f_x1, s_y2), (s_x1, s_y1)
+        def on_segment(p, q, r):
+            return (min(p[0], r[0]) - EPS <= q[0] <= max(p[0], r[0]) + EPS and
+                    min(p[1], r[1]) - EPS <= q[1] <= max(p[1], r[1]) + EPS)
 
-        elif f_y1 == f_y2 and s_y1 <= f_y1 <= s_y2:
-            if (f_x1 <= s_x1 <= f_x2):
-                return (s_x1, f_y1), (s_x2, s_y2)
+        def orientation(p, q, r):
+            val = (q[1] - p[1]) * (r[0] - q[0]) - \
+                (q[0] - p[0]) * (r[1] - q[1])
+            if abs(val) < EPS:
+                return 0
+            return 1 if val > 0 else 2
 
-            elif (f_x1 <= s_x2 <= f_x2):
-                return (s_x2, f_y2), (s_x1, s_y1)
+
+        def do_intersect(p1, q1, p2, q2):
+            """Проверяет, пересекаются ли отрезки p1q1 и p2q2"""
+            o1 = orientation(p1, q1, p2)
+            o2 = orientation(p1, q1, q2)
+            o3 = orientation(p2, q2, p1)
+            o4 = orientation(p2, q2, q1)
+
+            # Общий случай
+            if o1 != o2 and o3 != o4:
+                return True
+
+            # Частные случаи (наложения на концах)
+            if o1 == 0 and on_segment(p1, p2, q1): return True
+            if o2 == 0 and on_segment(p1, q2, q1): return True
+            if o3 == 0 and on_segment(p2, p1, q2): return True
+            if o4 == 0 and on_segment(p2, q1, q2): return True
+
+            return False
+
+        def intersection(p1, p2, p3, p4):
+            """Возвращает точку или отрезок пересечения"""
+            def det(a, b, c, d):
+                return a * d - b * c
+
+            if not do_intersect(p1, p2, p3, p4):
+                return None
+
+            # Прямая AB: A + t(B - A), прямая CD: C + u(D - C)
+            x1, y1 = p1
+            x2, y2 = p2
+            x3, y3 = p3
+            x4, y4 = p4
+
+            denom = det(x1 - x2, y1 - y2, x3 - x4, y3 - y4)
+            if denom == 0:
+                # Прямые коллинеарны — проверим наложение
+                points = sorted([p1, p2, p3, p4])
+                a, b, c, d = points
+                if on_segment(b, c, c):  # Участок пересечения
+                    return c
+                elif on_segment(b, d, c):
+                    return (c, d)  # Пересечение — отрезок
+                else:
+                    return None
+
+            # Прямые пересекаются — найдём точку
+            px = det(det(x1, y1, x2, y2), x1 - x2,
+                    det(x3, y3, x4, y4), x3 - x4) / denom
+            py = det(det(x1, y1, x2, y2), y1 - y2,
+                    det(x3, y3, x4, y4), y3 - y4) / denom
+
+            if on_segment(p1, (px, py), p2) and on_segment(p3, (px, py), p4):
+                return (px, py)
+            return None
+
+        p1 = (f_x1, f_y1)
+        p2 = (f_x2, f_y2)
+        p3 = (s_x1, s_y1)
+        p4 = (s_x2, s_y2)
+
+        return intersection(p1, p2, p3, p4)
    
     def get_shapes_connections(self, shapes: list[Shape]):
         """
         Получить все связи между фигурами
         """
-        connects = {}
+        graph = nx.Graph()
         for shape in shapes:
-            # _x1, _y1, _x2, _y2 = shape.bounds
-            # bounds = ((min(_x1, _x2), min(_y1, _y2), max(_x1, _x2), max(_y1, _y2)))
+            _x1, _y1, _x2, _y2 = shape.bounds
             x1, y1, x2, y2 = (round(bound, ROUND) for bound in shape.bounds)
 
-            dist = math.dist([x1, y1], [x2, y2])
+            dist = math.dist([_x1, _y1], [_x2, _y2]) * INCH_TO_M
             
-            connects.setdefault((x1, y1), {})[(x2, y2)] = dist
-            connects.setdefault((x2, y2), {})[(x1, y1)] = dist
+            graph.add_edge((x1, y1), (x2, y2), weight=dist)
 
-            intersections = [(x2, y2), (x1, y1)]
+            nodes = [(x2, y2), (x1, y1)]
 
-            for checked_shape in shapes:
-                if shape.ID == checked_shape.ID:
+            for connected_shape in shapes:
+                if connected_shape.ID == shape.ID:
                     continue
 
-                data = self.get_shapes_intersection(shape, checked_shape)
+                _new_node = self.get_shapes_intersection(shape, connected_shape)
 
-                if data is None:
+                # нужно решить проблему с отсутствием пересечения, когда фигуры есть в connects
+                if _new_node is None:
                     continue
 
-                new_node, opposite_node = data
+                # а зачем мне так много условий в предыдущем коде, если я могу добавить новую ноду в список, отсортировать его и взять предыдущую и следующую ноду? 
+                new_node = (round(_new_node[0], ROUND), round(_new_node[1], ROUND))
 
-                intersections.sort()
+                if new_node in nodes:
+                    continue
 
-                for i in range(len(intersections) - 1):
-                    previous_node = intersections[i]
-                    next_node = intersections[i+1]
+                nodes.append(new_node)
+                nodes.sort(key=lambda items: (items[0]**2) + (items[1]**2))
 
-                    # Если новая точка равна по x или y с предыдущей или следующей точкой, но при этом она находится вне них
-                    if ((previous_node[0] == next_node[0] == new_node[0] and (new_node[1] < previous_node[1] or new_node[1] > next_node[1])) or
-                        (previous_node[1] == next_node[1] == new_node[1] and (new_node[0] < previous_node[0] or new_node[0] > next_node[0]))
-                        ):
-                        continue
-                    # Если точка не равна ни по x, ни по y с предыдущей или следующей точкой
-                    elif previous_node[0] != next_node[0] and previous_node[1] != next_node[1]:
-                        t_x = (new_node[0] - previous_node[0]) / (next_node[0] - previous_node[0])                        
-                        t_y = (new_node[1] - previous_node[1]) / (next_node[1] - previous_node[1])
+                previous_node = nodes[nodes.index(new_node)-1]
+                next_node = nodes[nodes.index(new_node)+1]
 
-                        # Тогда вычисляем коэффииент t и проверяем, что он не входит в диапазон 0>=t<=1
-                        if t_x != t_y or (0 > t_x or 1 < t_x):
-                            continue
+                graph.remove_edge(previous_node, next_node)
+                
+                previous_new_dist = math.dist(previous_node, _new_node) * INCH_TO_M
+                new_next_dist = math.dist(_new_node, next_node) * INCH_TO_M
 
-                    if previous_node == new_node or new_node == next_node:
-                        continue
+                graph.add_edge(previous_node, new_node, weight=previous_new_dist)
+                graph.add_edge(new_node, next_node, weight=new_next_dist)
 
-                    connects[previous_node].pop(next_node)
-                    connects[next_node].pop(previous_node)
+                print(previous_node, new_node, next_node, nodes)
 
-                    previous_new_dist = math.dist(previous_node, new_node)
-                    next_new_dist = math.dist(next_node, new_node)
+        nodes = graph.copy().nodes
 
-                    connects[previous_node].update({new_node: previous_new_dist})
-                    connects[next_node].update({new_node: next_new_dist})
+        for node in nodes:
+            len_neighbors = len([n for n in graph.neighbors(node)])
+            if len_neighbors <= 1:
+                graph.remove_node(node)
 
-                    connects.setdefault(new_node, {}).update({
-                        previous_node: previous_new_dist,
-                        next_node: next_new_dist
-                    })
+        return graph
 
-                    break
-
-                if new_node not in intersections:
-                    intersections.append(new_node)
-                    intersections.sort()
-
-        # jsonOperations.jsonDump("test", connects)
-
-        return connects
-    
 
     def get_minimum_shape_distance_inside_polygon(self, shape: Shape, polygon_node: list[tuple] | Graph, page: int = 0) -> list:
         """

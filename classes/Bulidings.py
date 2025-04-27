@@ -119,13 +119,21 @@ class Floor():
 
     def __init__(self, graph, wall_shape):
         self.tool = VisioTool()
-        self.graph = graph
         self.wall_shape = wall_shape
 
-        self.G = nx.Graph()
-        for node, neighbors in self.graph.items():
-            for neighbor, weight in neighbors.items():
-                self.G.add_edge(node, neighbor, weight = weight * INCH_TO_M)
+        self.graph = graph
+        if isinstance(self.graph, dict):
+            self.G = nx.Graph()
+            for node, neighbors in self.graph.items():
+                for neighbor, weight in neighbors.items():
+                    try:
+                        weight = weight["weight"]
+                    except:
+                        pass
+                    
+                    self.G.add_edge(node, neighbor, weight = weight * INCH_TO_M)
+        else:
+            self.G = graph
 
         self.area = 0.0
 
