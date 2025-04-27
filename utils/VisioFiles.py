@@ -11,6 +11,7 @@ from networkx import Graph
 
 ROUND = 2
 INCH_TO_M = 0.0254
+EPS = 1e-8 
 
 class VisioTool():
     """
@@ -113,89 +114,6 @@ class VisioTool():
         except Exception as e:
             ...
 
-    def get_shapes_intersection(self, first_shape: Shape, second_shape: Shape):
-        """
-        Возвращает пересечение между фигурами. `None`, если пересечений нет
-        """
-        f_x1, f_y1, f_x2, f_y2 = (round(bound, ROUND) for bound in first_shape.bounds)
-        s_x1, s_y1, s_x2, s_y2 = (round(bound, ROUND) for bound in second_shape.bounds)
-
-        EPS = 1e-8  # или 1e-8, если погрешности большие
-
-        def on_segment(p, q, r):
-            return (min(p[0], r[0]) - EPS <= q[0] <= max(p[0], r[0]) + EPS and
-                    min(p[1], r[1]) - EPS <= q[1] <= max(p[1], r[1]) + EPS)
-
-        def orientation(p, q, r):
-            val = (q[1] - p[1]) * (r[0] - q[0]) - \
-                (q[0] - p[0]) * (r[1] - q[1])
-            if abs(val) < EPS:
-                return 0
-            return 1 if val > 0 else 2
-
-
-        def do_intersect(p1, q1, p2, q2):
-            """Проверяет, пересекаются ли отрезки p1q1 и p2q2"""
-            o1 = orientation(p1, q1, p2)
-            o2 = orientation(p1, q1, q2)
-            o3 = orientation(p2, q2, p1)
-            o4 = orientation(p2, q2, q1)
-
-            # Общий случай
-            if o1 != o2 and o3 != o4:
-                return True
-
-            # Частные случаи (наложения на концах)
-            if o1 == 0 and on_segment(p1, p2, q1): return True
-            if o2 == 0 and on_segment(p1, q2, q1): return True
-            if o3 == 0 and on_segment(p2, p1, q2): return True
-            if o4 == 0 and on_segment(p2, q1, q2): return True
-
-            return False
-
-        def intersection(p1, p2, p3, p4):
-            """Возвращает точку или отрезок пересечения"""
-            def det(a, b, c, d):
-                return a * d - b * c
-
-            if not do_intersect(p1, p2, p3, p4):
-                return None
-
-            # Прямая AB: A + t(B - A), прямая CD: C + u(D - C)
-            x1, y1 = p1
-            x2, y2 = p2
-            x3, y3 = p3
-            x4, y4 = p4
-
-            denom = det(x1 - x2, y1 - y2, x3 - x4, y3 - y4)
-            if denom == 0:
-                # Прямые коллинеарны — проверим наложение
-                points = sorted([p1, p2, p3, p4])
-                a, b, c, d = points
-                if on_segment(b, c, c):  # Участок пересечения
-                    return c
-                elif on_segment(b, d, c):
-                    return (c, d)  # Пересечение — отрезок
-                else:
-                    return None
-
-            # Прямые пересекаются — найдём точку
-            px = det(det(x1, y1, x2, y2), x1 - x2,
-                    det(x3, y3, x4, y4), x3 - x4) / denom
-            py = det(det(x1, y1, x2, y2), y1 - y2,
-                    det(x3, y3, x4, y4), y3 - y4) / denom
-
-            if on_segment(p1, (px, py), p2) and on_segment(p3, (px, py), p4):
-                return (px, py)
-            return None
-
-        p1 = (f_x1, f_y1)
-        p2 = (f_x2, f_y2)
-        p3 = (s_x1, s_y1)
-        p4 = (s_x2, s_y2)
-
-        return intersection(p1, p2, p3, p4)
-   
     def get_shapes_connections(self, shapes: list[Shape]):
         """
         Получить все связи между фигурами
@@ -214,12 +132,32 @@ class VisioTool():
             for connected_shape in shapes:
                 if connected_shape.ID == shape.ID:
                     continue
+            
+                x3, y3, x4, y4 = (round(bound, ROUND) for bound in connected_shape.bounds)
 
-                _new_node = self.get_shapes_intersection(shape, connected_shape)
+                A = x2 - x1
+                B = -(x4 - x3)
+                C = y2 - y1
+                D = -(y4 - y3)
+                E = x3 - x1
+                F = y3 - y1
 
-                # нужно решить проблему с отсутствием пересечения, когда фигуры есть в connects
-                if _new_node is None:
+                delta = A*D - B*C
+                delta_t = E*D - B*F
+                delta_u = A*F - E*C
+
+                if abs(delta) <= EPS:
                     continue
+                
+                t = delta_t / delta
+                u = delta_u / delta
+
+                if not (0 - EPS <= t <= 1 + EPS and 0 - EPS <= u <= 1 + EPS):
+                    continue
+
+                xi = x1 + t*(x2 - x1)
+                yi = y1 + t*(y2 - y1)
+                _new_node = (xi, yi)
 
                 # а зачем мне так много условий в предыдущем коде, если я могу добавить новую ноду в список, отсортировать его и взять предыдущую и следующую ноду? 
                 new_node = (round(_new_node[0], ROUND), round(_new_node[1], ROUND))
@@ -356,27 +294,10 @@ class VisioTool():
         for edge in edges:
             previous_node, next_node = edge
 
-            # no way
             if (min(previous_node[0], next_node[0]) <= node[0] <= max(previous_node[0], next_node[0]) 
                 and min(previous_node[1], next_node[1]) <= node[1] <= max(previous_node[1], next_node[1])
             ):
                 return edge
-
-            # if (
-            #     (previous_node[0] == next_node[0] == node[0] and min(previous_node[1], next_node[1]) <= node[1] <= max(previous_node[1], next_node[1])) or
-            #     (previous_node[1] == next_node[1] == node[1] and min(previous_node[0], next_node[0]) <= node[0] <= max(previous_node[0], next_node[0]))
-            # ):
-            #     return edge
-
-            # if previous_node[0] != next_node[0] and previous_node[1] != next_node[1]:
-            #     # Находим параметр t для x и y
-            #     t_x = (node[0] - previous_node[0]) / (next_node[0] - previous_node[0])                        
-            #     t_y = (node[1] - previous_node[1]) / (next_node[1] - previous_node[1])
-
-            #     if round(t_x, 1) == round(t_y, 1) and 0 <= t_x <= 1:
-            #         return edge
-
-            
 
     def save_graph(self, name,  graph: Graph, colors: list = "black", debug: bool = False) -> str: # так называемый дебаг
         tmp = TempFilesManager()
