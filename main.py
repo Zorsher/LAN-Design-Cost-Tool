@@ -5,7 +5,8 @@ from gui import MainWindow, Application
 
 def main():
     import sys
-    tmp = TempFilesManager()
+    SignalHandler()
+    TempFilesManager()
 
     app = Application([])
 

@@ -7,7 +7,7 @@ from typing import Union
 class ScrollArea(QScrollArea):
     def __init__(self, hideScrollBar: bool = False, layoutType: Union[QVBoxLayout, QHBoxLayout] = QVBoxLayout, isInverted = False, ignore_scroll_down = False):
         super().__init__()
-        self.ingnore_scroll_down = ignore_scroll_down
+        self.ignore_scroll_down = ignore_scroll_down
         self.isInverted = isInverted
         self.setWidgetResizable(True)
         self.setObjectName("Channel")
@@ -24,7 +24,6 @@ class ScrollArea(QScrollArea):
 
     def addWidget(self, widget: Union[QWidget, QBoxLayout], alignment = QtCore.Qt.AlignmentFlag.AlignLeft, index = -1):
         if self.isInverted and self.scrollLayout.count() > 1:
-
             widgetItem = self.scrollLayout.takeAt(self.scrollLayout.count()-1)
             if isinstance(widgetItem, QWidget):
                 widgetItem.deleteLater()
@@ -35,7 +34,7 @@ class ScrollArea(QScrollArea):
             self.scrollLayout.insertLayout(index, widget)
         self.scrollLayout.addStretch(1) if self.isInverted else ...
 
-        if not self.ingnore_scroll_down:
+        if not self.ignore_scroll_down:
             QtCore.QTimer.singleShot(5, lambda: self.verticalScrollBar().setValue(self.verticalScrollBar().maximum()+50))
 
     def delWidget(self, item: QWidget | QBoxLayout):

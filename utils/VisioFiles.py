@@ -179,7 +179,7 @@ class VisioTool():
                 graph.add_edge(previous_node, new_node, weight=previous_new_dist)
                 graph.add_edge(new_node, next_node, weight=new_next_dist)
 
-                print(previous_node, new_node, next_node, nodes)
+                # print(previous_node, new_node, next_node, nodes)
 
         nodes = graph.copy().nodes
 

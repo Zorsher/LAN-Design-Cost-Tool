@@ -1,5 +1,5 @@
 from PySide6 import QtWidgets, QtCore, QtGui
-from ..widgets import PushButton, ScrollArea, PictureWidget
+from ..widgets import PushButton, ScrollArea, PictureWidget, AreaInput
 from classes import Floor, Room, Item
 from utils import VisioTool
 import math
@@ -22,17 +22,27 @@ class ResultsWidget(QtWidgets.QWidget):
             self.core_layout = QtWidgets.QVBoxLayout()
             self.central_widget.setLayout(self.core_layout)
 
-            self.room_name_label = QtWidgets.QLabel(room.name)
+            self.room_name_label = QtWidgets.QTextBrowser()
+            self.room_name_label.setStyleSheet("""
+                border: 0px solid rgba(0, 0, 0, 0.0);
+                """)
+            self.room_name_label.setText(room.name)
+            self.room_name_label.setDisabled(True)
+            self.room_name_label.setReadOnly(True)
+
+            if len(room.merged_with) != 0:
+                merged_room_name = ", ".join([room.name for room in room.merged_with])
+                self.room_name_label.setText(f"{self.room_name_label.toPlainText()}, {merged_room_name}")
+
             self.room_name_label.setObjectName("bold")
             self.room_name_label.setFont(QtGui.QFont(self.room_name_label.font().family(), 18))
 
-            self.sep_line = QtWidgets.QFrame()
-            self.sep_line.setFrameShape(QtWidgets.QFrame.Shape.HLine)
-            self.sep_line.setFrameShadow(QtWidgets.QFrame.Shadow.Sunken)
-            # self.sep_line.setFixedHeight(1)
+            doc = self.room_name_label.document()
+            doc.setTextWidth(600)
+
+            self.room_name_label.setFixedHeight(int(doc.size().height())+5)
 
             self.core_layout.addWidget(self.room_name_label)
-            self.core_layout.addWidget(self.sep_line)
 
             sum_leight = 0
 
@@ -136,9 +146,10 @@ class ResultsWidget(QtWidgets.QWidget):
         self.floor_area_label = QtWidgets.QLabel("Напишите площадь этажа в квадратных метрах")
         self.floor_area_label.setObjectName("bold")
 
-        self.floor_area_input = QtWidgets.QLineEdit()
-        self.floor_area_input.setObjectName("red")
+        self.floor_area_input = AreaInput()
         self.floor_area_input.textChanged.connect(self.area_input_changed)
+        self.floor_area_input.enterPressed.connect(self.show_results)
+        self.floor_area_input.setObjectName("red")
         self.floor_area_input.setPlaceholderText("120 м²")
 
         self.area_continue_button = PushButton("Продолжить")
@@ -198,11 +209,16 @@ class ResultsWidget(QtWidgets.QWidget):
         self.floor_area_input.setPlaceholderText(f"{self.floor.area*10000}".split(".")[0]) # почему нет?
 
     def show_results(self):
+        if not self.area_continue_button.isEnabled():
+            return
+
         self.stacked_layout.setCurrentIndex(1)
         for room in self.floor.rooms:
-            if (room.status == 0 or 
+
+            if (room.ignore or
+                room.status == 0 or 
                 room.status == -1 or
-                (room.full_leight == 0 and len(room.calculated_paths) == 0)
+                (room.full_leight == 0 and len(room.calculated_paths) == 0) 
                 ):
                 continue
 

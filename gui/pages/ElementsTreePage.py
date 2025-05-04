@@ -198,7 +198,7 @@ class ElementsTreeWidget(QtWidgets.QWidget):
             element_type = data[0]
             shape_from = data[1]
             shape_to = data[2]
-            print("данные", f"id: {id}, shape_from: {shape_from}, shape_to: {shape_to}")
+            # print("данные", f"id: {id}, shape_from: {shape_from}, shape_to: {shape_to}")
 
             if element_type not in connections:
                 connections[element_type] = [shape_from, shape_to]

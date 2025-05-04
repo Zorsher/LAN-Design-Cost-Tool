@@ -1,4 +1,5 @@
 from .widgets import (
+    EnteredCombo,
     Application, 
     ScrollArea, 
     PopupDialog, 

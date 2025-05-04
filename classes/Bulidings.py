@@ -4,6 +4,7 @@ import networkx as nx
 from vsdx import Shape, Page
 from utils import VisioTool
 from networkx import Graph
+from typing import Self
 
 INCH_TO_M = 0.0254
 ROUND = 2
@@ -29,6 +30,7 @@ class Room():
     ID: int
     name: str
     status: str
+    original_graph: Graph
     graph: Graph
     items: dict[str, list[Item]]
     reference_nodes: list # Что если их несколько?
@@ -37,18 +39,21 @@ class Room():
     full_leight: int = 0
     final_nodes_leight: dict[tuple, int]
     calculated_paths: list = None
-
-
+    ignore: bool
+    merged_with: list[Self]
     
     def __init__(self, graph: list, parent):
         self.parent: Floor = parent
         self.ID = uuid.uuid4()
         self.items = {}
+        self.original_items = {}
         self.final_nodes_leight = {}
         self.reference_nodes = []
         self.calculated_paths = []
         self.tool = VisioTool()
         self.graph = graph
+        self.ignore = False
+        self.merged_with = []
 
         self.room_picture_path = self.tool.save_graph_with_highlighted_edges(str(self.ID), parent.G, self.graph.edges)
 
@@ -69,6 +74,8 @@ class Room():
                     self.items[key] = [item]
                 else:
                     self.items[key].append(item)
+
+        self.original_items = self.items.copy()
 
 
     def find_paths_by_shapes_id(self, start_shape_id: int, end_shape_id: int):
@@ -138,6 +145,7 @@ class Floor():
         self.area = 0.0
 
         for room in nx.minimum_cycle_basis(self.G):
+            print(room)
             room_graph = nx.Graph()
             len_room = len(room)
             area = 0
@@ -146,30 +154,68 @@ class Floor():
                 area += room[i][0] * room[(i + 1) % len_room][1] - room[(i + 1) % len_room][0] * room[i][1]
                 room_graph.add_edge(room[i], room[(i + 1) % len_room], weight=self.G[room[i]][room[(i + 1) % len_room]]["weight"])
 
-            print(abs(area)*0.00064516)
-
             area = abs(area)
 
             self.area+=(area*0.00064516)
 
+            original_graph = room_graph.copy()
+
             room = Room(room_graph, self)
+            room.original_graph = original_graph
+
             self.rooms.append(room)
 
         self.area*=0.5
-        
 
+    def merge_rooms(self, first_room: Room, second_room: Room):
+        """
+        Объеденяет две комнаты в одну. Позволяет объеденить не только графы, но и элементы внутри комнат.
 
-        print(self.area)
-    def find_outside_paths(self, outside_items):
-        print(outside_items)
+        :param: first_room: `Room` - первый объект класса Room.
+        :param: second_room: `Room` - второй объект класса Room.
+        """
 
+        # f"{first_room.ID}_{"_".join([str(room.ID) for room in first_room.merged_with])}"
 
+        first_room.merged_with.append(second_room)
+        second_room.merged_with.append(first_room)
+        second_room.ignore = True
 
+        all_rooms: set[Room] = set()
+        all_rooms.update([room for room in first_room.merged_with])
+        all_rooms.update([room for room in second_room.merged_with])
 
-# class Building():
-#     floors: list[Floor]
+        all_graphs = set()
+        all_graphs.update([room.original_graph for room in first_room.merged_with])
+        all_graphs.update([room.original_graph for room in second_room.merged_with])
 
-#     def __init__(self, graph: dict):
-#         # Пройтись по каждому уникальному
-#         ...
+        merged_graph: nx.Graph = nx.compose_all(all_graphs)
+
+        picture_path = self.tool.save_graph_with_highlighted_edges(f"{uuid.uuid4()}", self.G, merged_graph.edges)
+
+        items = {}
+
+        for room in all_rooms:
+            for key, values in room.original_items.items():
+                for value in values:
+                    new_node = value.projecton
+                    previous_node, next_node = self.tool.find_edge_for_node(new_node, merged_graph)
+                    print(previous_node, value.projecton, next_node)
+
+                    previous_new_dist = math.dist(previous_node, new_node) * INCH_TO_M
+                    new_next_dist = math.dist(new_node, next_node) * INCH_TO_M
+
+                    merged_graph.remove_edge(previous_node, next_node)
+                    merged_graph.add_edge(previous_node, new_node, weight=previous_new_dist)
+                    merged_graph.add_edge(new_node, next_node, weight=new_next_dist)
+
+                    items.setdefault(key, []).append(value)
+
+        first_room.items = items
+        first_room.graph = merged_graph
+
+        return picture_path, merged_graph
+
+        # for key, values in items.items():
+        #     print(key, values[0].name, len(values))
 

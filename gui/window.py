@@ -73,10 +73,7 @@ class MainWindow(QtWidgets.QMainWindow):
                     
                     next_item = self.outside_items[index+1]
 
-                    if next_item in items:
-                        items[next_item].append(self.outside_items[index])
-                    else:
-                        items[next_item] = [self.outside_items[index]]
+                    items.setdefault(next_item, []).append(self.outside_items[index])
 
                 corridors: set[tuple] = set()
 
@@ -84,6 +81,9 @@ class MainWindow(QtWidgets.QMainWindow):
                 for room in self.floor.rooms:
                     if room.status == 2:
                         corridors.update(room.graph.nodes)
+
+                    if room.ignore:
+                        continue
 
                     for index in range(len(self.inside_items) - 1):
                         # print(room.name)
@@ -113,7 +113,7 @@ class MainWindow(QtWidgets.QMainWindow):
                         ) 
 
                         for room in self.floor.rooms 
-                        if reference_shape.page_id in room.items
+                        if reference_shape.page_id in room.items and not room.ignore
                         ][0] # вопросы?
                     
                     for connected_shape in connected_shapes:
@@ -125,16 +125,16 @@ class MainWindow(QtWidgets.QMainWindow):
                             if connected_shape.page_id not in room.items:
                                 continue
 
+                            if room.ignore:
+                                continue
+
                             item = room.items[connected_shape.page_id][0]
 
                             room_node, room_leight = self.tool.get_minimum_distance_to_graph_nodes(self.floor.G, item.projecton, list(corridors))
 
                             room.final_nodes_leight[(reference_shape.page_id, connected_shape.page_id)] = (room_leight + final_leight)
 
-                            if room_node not in rooms_nodes:
-                                rooms_nodes[room_node] = [room]
-                            else:
-                                rooms_nodes[room_node].append(room)
+                            rooms_nodes.setdefault(room_node, []).append(room)
 
                         # поиск путей внутри вершин коридора
                         # its over...
@@ -143,6 +143,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
                         for room in self.floor.rooms:
                             if room.status != 2:
+                                continue
+
+                            if room.ignore:
                                 continue
 
                             room.calculated_paths.append(nodes)

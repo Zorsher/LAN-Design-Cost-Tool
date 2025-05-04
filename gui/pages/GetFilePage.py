@@ -30,7 +30,7 @@ class GetFilesWidget(QtWidgets.QWidget):
 
     def add_file_clicked(self):
         file_path = QtWidgets.QFileDialog.getOpenFileName(filter="(*vsdx)")
-        if file_path == "":
+        if file_path[0] == "":
             return
         
         self.add_file.setEnabled(False)
