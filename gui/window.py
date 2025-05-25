@@ -61,6 +61,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 graph = self.tool.get_shapes_connections(shapes)
 
                 self.floor = Floor(graph, wall_shape)
+                self.floor.used_items = set(self.inside_items + self.outside_items)
 
                 self.third_page.load_page(self.floor, self.inside_items, self.outside_items)
 

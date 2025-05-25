@@ -5,6 +5,7 @@ class SignalHandler():
 
     class Signals(QtCore.QObject):
         rooms_querry = QtCore.Signal(object)
+        cost_changed = QtCore.Signal(int, object)
 
     def __new__(cls):
         if cls._instance is None:

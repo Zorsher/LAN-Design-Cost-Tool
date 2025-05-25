@@ -100,7 +100,6 @@ class RoomsStatusWidget(QtWidgets.QWidget):
                     self.merge_combobox.setItemText(self.merge_combobox.findData(room), querry["value"])
 
                 case "merge":
-                    ...
                     item_to_remove: RoomsStatusWidget.RoomWidget = querry["second_room"]
                     self.merge_combobox.setCurrentIndex(0)
 

@@ -1,10 +1,97 @@
 from PySide6 import QtWidgets, QtCore, QtGui
 from ..widgets import PushButton, ScrollArea, PictureWidget, AreaInput
 from classes import Floor, Room, Item
-from utils import VisioTool
+from utils import VisioTool, SignalHandler
+from vsdx import Page
+
 import math
 
 INCH_TO_M = 0.0254
+
+class FinalCost(QtWidgets.QHBoxLayout):
+    def __init__(self, item: tuple[Page, str], multiplier, index):
+        super().__init__()
+        self.multiplier = multiplier
+        self.item = item
+        self.index = index
+
+        if item is not None:
+            self.page = item[0]
+            self.path = item[1]
+            self.icon = PictureWidget(self.path, QtCore.QSize(30, 30))
+            self.icon.setFixedSize(30, 30)
+            self.addWidget(QtWidgets.QLabel(f"Стоимость элемента {self.page.name} (x{multiplier})"))
+            self.addWidget(self.icon)
+        else:
+            self.addWidget(QtWidgets.QLabel("Стоимость кабеля в бухте"))
+            self.multiplier_widget = QtWidgets.QLabel(f"(x{math.ceil(multiplier/100)})")
+            self.addWidget(self.multiplier_widget)
+
+            self.coil_box = QtWidgets.QComboBox()
+            self.coil_box.addItem("100 м", 100)
+            self.coil_box.addItem("305 м", 305)
+            self.coil_box.addItem("500 м", 500)
+            self.coil_box.addItem("1000 м", 1000)
+            self.coil_box.currentIndexChanged.connect(self.coil_box_changed)
+
+            self.addWidget(self.coil_box)
+
+        self.cost_input = AreaInput()
+        self.cost_input.setPlaceholderText("10000")
+
+        self.cost_label = QtWidgets.QLabel(f"{self.multiplier*0}")
+        self.cost_label.setFixedWidth(70)
+        self.cost_input.textChanged.connect(self.cost_changed)
+
+
+        self.addWidget(QtWidgets.QLabel("составляет"))
+        self.addWidget(self.cost_input)
+        self.addSpacing(0)
+        self.addWidget(QtWidgets.QLabel("Общая стоимость:"))
+        self.addSpacing(0)
+        self.addWidget(self.cost_label)
+
+        self.addStretch()
+
+    def cost_changed(self, text):
+        print(text)
+        try:
+            cost = int(text)
+            if cost <= 0:
+                raise
+
+            self.cost_input.setObjectName("type1")
+            self.cost_input.style().polish(self.cost_input)
+
+            if self.item is None:
+                self.coil_box_changed(self.coil_box.currentIndex())
+                return
+        except:
+            self.cost_input.setObjectName("red")
+            self.cost_input.style().polish(self.cost_input)
+            return
+
+        final_cost = int(cost*self.multiplier)
+        self.cost_label.setText(f"{final_cost}")
+
+        SignalHandler().cost_changed.emit(self.index, final_cost)
+
+    def coil_box_changed(self, index):
+        coil = self.coil_box.itemData(index)
+
+        coil_count = math.ceil(self.multiplier / coil)
+
+        self.multiplier_widget.setText(f"(x{(coil_count)})")
+        
+        try:
+            cost_text = int(self.cost_input.text())
+            cost = int(coil_count * cost_text)
+            self.cost_label.setText(str(cost))
+            
+            SignalHandler().cost_changed.emit(self.index, cost)
+        except:
+            self.cost_label.setText("0")
+
 
 class ResultsWidget(QtWidgets.QWidget):
     area_changed = QtCore.Signal(object)
@@ -211,10 +298,11 @@ class ResultsWidget(QtWidgets.QWidget):
     def show_results(self):
         if not self.area_continue_button.isEnabled():
             return
+        
+        overall_items = {}
 
         self.stacked_layout.setCurrentIndex(1)
         for room in self.floor.rooms:
-
             if (room.ignore or
                 room.status == 0 or 
                 room.status == -1 or
@@ -222,15 +310,61 @@ class ResultsWidget(QtWidgets.QWidget):
                 ):
                 continue
 
+            for used_item in self.floor.used_items:
+                if used_item.page_id not in list(room.items.keys()):
+                    continue
+
+                overall_items.setdefault(used_item.page_id, 0)
+                overall_items[used_item.page_id] += len(room.items[used_item.page_id])
+
+
             room_results = ResultsWidget.RoomResults(room, self.multiplier)
             self.scroll_area.addWidget(room_results)
 
-
-        final_leight_label = QtWidgets.QLabel(f"ИТОГО: {self.floor.full_leight} + 5% = {math.ceil(self.floor.full_leight+(self.floor.full_leight*0.05))} м.")
+        print(overall_items)
+        final_leight = math.ceil(self.floor.full_leight+(self.floor.full_leight*0.05))
+        final_leight_label = QtWidgets.QLabel(f"ИТОГО: {self.floor.full_leight} + 5% = {final_leight} м.")
         final_leight_label.setObjectName("bold")
 
         final_leight_layout = QtWidgets.QHBoxLayout()
         final_leight_layout.addSpacing(9)
         final_leight_layout.addWidget(final_leight_label)
 
+        cost_items_layout = QtWidgets.QVBoxLayout()
+        cost_items_layout.setContentsMargins(QtCore.QMargins(8, 0, 0, 0) + cost_items_layout.contentsMargins())
+
+        self.items_cost = []
+        cable_cost = FinalCost(None, final_leight, 0)
+        self.items_cost.append(0)
+        cost_items_layout.addLayout(cable_cost)
+
+        for index, data in enumerate(overall_items.items(), 1):
+            item_id, count = data
+            item = self.floor.tool.master_shapes[item_id]
+            final_item_cost = FinalCost(item, count, index)
+            cost_items_layout.addLayout(final_item_cost)
+            self.items_cost.append(0)
+
+        self.final_cost_layout = QtWidgets.QHBoxLayout()
+
+        self.final_cost = QtWidgets.QLabel("0")
+        self.final_cost_with_percent = QtWidgets.QLabel("0")
+
+        self.final_cost_layout.addWidget(QtWidgets.QLabel("Конечная стоимость"))
+        self.final_cost_layout.addWidget(self.final_cost)
+        self.final_cost_layout.addWidget(QtWidgets.QLabel("+ 35% ="))
+        self.final_cost_layout.addWidget(self.final_cost_with_percent)
+        self.final_cost_layout.addStretch()
+
+        SignalHandler().cost_changed.connect(self.cost_changed)
+
         self.scroll_area.addWidget(final_leight_layout)
+        self.scroll_area.addWidget(cost_items_layout)
+        self.scroll_area.addWidget(self.final_cost_layout)
+
+    def cost_changed(self, index, cost):
+        self.items_cost[index] = cost
+        c = sum(self.items_cost)
+
+        self.final_cost.setText(str(c))
+        self.final_cost_with_percent.setText(str(math.ceil(c + (c*0.35))))

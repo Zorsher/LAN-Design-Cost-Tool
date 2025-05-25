@@ -1,5 +1,5 @@
 from PySide6 import QtWidgets, QtGui
-# from utils import TempFile
+# from utils import TempFilesManager
 
 def load_style():
     with open("gui/style.qss", "r+") as file:
@@ -18,5 +18,5 @@ class Application(QtWidgets.QApplication):
     def event(self, a0):  
         if a0.type() == a0.Type.Quit:
             ...
-            # TempFile._tempDir.remove()
+            # TempFilesManager._tempDir.remove()
         return super().event(a0)

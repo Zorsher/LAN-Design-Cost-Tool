@@ -23,7 +23,7 @@ class Item():
         self.name = self.tool.get_shape_name_by_id(self.shape.master_page_ID)
 
     def __repr__(self):
-        return f"Name: {self.name}, ID: {self.shape.ID}, Original pos: {self.shape.center_x_y}, Projection: {self.projecton}"
+        return f"Name: {self.name}, ID: {self.shape.ID}, Master ID: {self.shape.master_page_ID}, Original pos: {self.shape.center_x_y}, Projection: {self.projecton}"
 
 
 class Room():
@@ -120,6 +120,7 @@ class Floor():
     ID: int
     rooms: list[Room] = []
     corridor_rooms: list[Room] = []
+    used_items: list[Page] = []
     area: float
     wall_shape: Page
     full_leight: int = 0

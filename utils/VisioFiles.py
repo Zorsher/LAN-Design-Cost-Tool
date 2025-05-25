@@ -244,6 +244,9 @@ class VisioTool():
 
         for shape in all_shapes:
             # добавить whitelist для фигур, которые нужно учитывать
+            if shape.master_page_ID == None:
+                continue
+
             if shape.master_page_ID == wall_shape.page_id:
                 continue
 
