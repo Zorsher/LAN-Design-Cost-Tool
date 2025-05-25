@@ -1,6 +1,6 @@
 vsdx==0.5.19
 PySide6==6.8.1
+PySide6_Addons==6.8.1
+PySide6_Essentials==6.8.1
 networkx==3.4.2
-numpy==2.2.2
-matplotlib==3.10.0
 pywin32==310
