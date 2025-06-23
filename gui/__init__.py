@@ -4,7 +4,6 @@ from .widgets import (
     ScrollArea, 
     PopupDialog, 
     PushButton, 
-    HoldButton,
     MessageInput
     )
 

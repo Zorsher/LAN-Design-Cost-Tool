@@ -3,6 +3,7 @@ import networkx as nx
 import matplotlib.pyplot as plt
 import win32com.client
 import os
+# import gif
 
 from utils.TempFile import TempFilesManager
 from vsdx import VisioFile as VsdxFile
@@ -119,6 +120,8 @@ class VisioTool():
         Получить все связи между фигурами
         """
         graph = nx.Graph()
+
+        # c = 100
         for shape in shapes:
             _x1, _y1, _x2, _y2 = shape.bounds
             x1, y1, x2, y2 = (round(bound, ROUND) for bound in shape.bounds)
@@ -128,6 +131,8 @@ class VisioTool():
             graph.add_edge((x1, y1), (x2, y2), weight=dist)
 
             nodes = [(x2, y2), (x1, y1)]
+            # print(self.save_graph_with_highlighted_edges(f"{c}", graph, [(x1, y1), (x2, y2)]))
+            # c+=1
 
             for connected_shape in shapes:
                 if connected_shape.ID == shape.ID:
@@ -179,6 +184,10 @@ class VisioTool():
                 graph.add_edge(previous_node, new_node, weight=previous_new_dist)
                 graph.add_edge(new_node, next_node, weight=new_next_dist)
 
+                # print(self.save_graph_with_highlighted_edges(f"{c}", graph, [(previous_node, new_node)]))
+                # c+=1
+                # print(self.save_graph_with_highlighted_edges(f"{c}", graph, [(next_node, new_node)]))
+                # c+=1
                 # print(previous_node, new_node, next_node, nodes)
 
         nodes = graph.copy().nodes
@@ -187,6 +196,10 @@ class VisioTool():
             len_neighbors = len([n for n in graph.neighbors(node)])
             if len_neighbors <= 1:
                 graph.remove_node(node)
+
+        # print(self.save_graph("final", graph))
+
+        # gif.create_gif(TempFilesManager._tempDir.path())
 
         return graph
 
@@ -302,7 +315,7 @@ class VisioTool():
             ):
                 return edge
 
-    def save_graph(self, name,  graph: Graph, colors: list = "black", debug: bool = False) -> str: # так называемый дебаг
+    def save_graph(self, name,  graph: Graph, colors: list = "black", debug: bool = False, nodes = None) -> str: # так называемый дебаг
         tmp = TempFilesManager()
 
         poses = {}
@@ -314,7 +327,12 @@ class VisioTool():
             poses[key] = (float(x), float(y))
 
         if debug:
-            nx.draw_networkx_nodes(graph, poses, node_size=500, node_color="lightblue")
+            nodes_colors = []
+
+            if nodes is not None:
+                nodes_colors = [colors if node in nodes else "red" for node in graph.nodes]
+
+            nx.draw_networkx_nodes(graph, poses, node_color=nodes_colors, node_size=100)  
             nx.draw_networkx_labels(graph, poses, font_size=8)
             edge_labels = nx.get_edge_attributes(graph, "weight")
 
@@ -404,13 +422,13 @@ class VisioTool():
         plt.axis("off")
         plt.show()
 
-    def save_graph_with_highlighted_edges(self, name, graph: Graph, edges: list[tuple], color: str = "red") -> str:
-        edge_colors = ["red" if edge in edges else "black" for edge in graph.edges]
-        path = self.save_graph(name, graph, edge_colors)
+    def save_graph_with_highlighted_edges(self, name, graph: Graph, edges: list[tuple], color: str = "red", debug: bool = False) -> str:
+        edge_colors = [color if edge in edges else "black" for edge in graph.edges]
+        path = self.save_graph(name, graph, edge_colors, debug)
         return path
     
     def draw_graph_with_highlighted_edges(self, graph: Graph, edges: list[tuple], color: str = "red") -> str:
-        edge_colors = ["red" if edge in edges else "black" for edge in graph.edges]
+        edge_colors = [color if edge in edges else "black" for edge in graph.edges]
         path = self.draw_graph(graph, edge_colors)
         return path
 

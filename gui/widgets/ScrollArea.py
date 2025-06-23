@@ -42,7 +42,6 @@ class ScrollArea(QScrollArea):
         if isinstance(item, QWidget):
             item.deleteLater()
         elif isinstance(item, QBoxLayout):
-            # Подразумеваю, что первый элемент лэйаута - виджет
             item = item.takeAt(0).widget()
             if item is not None:
                 item.deleteLater()

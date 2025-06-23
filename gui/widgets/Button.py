@@ -19,12 +19,6 @@ class PushButton(QtWidgets.QPushButton):
         self.style().polish(self)
 
     def setIcon(self, icon: Union[QtGui.QIcon, QtGui.QPixmap, QtGui.QImage, bytes]):
-        """Переписанный оригинальный `setIcon`. \n
-
-        Чё принимает?
-        -----------------
-        icon: `QIcon`, `QPixmap`, `QImage`, `bytes`
-            Если `QPixmap` или `QImage`, тогда изображение становится круглым. В случае `bytes` создаётся `QImage`."""
         if isinstance(icon, bytes):
             data = icon
             icon = QtGui.QImage()
@@ -61,41 +55,3 @@ class PushButton(QtWidgets.QPushButton):
         self.leaveEventRecived.emit(a0)
         return super().leaveEvent(a0)
 
-class HoldButton(PushButton):
-    holded = QtCore.Signal(object)
-    def __init__(self, time, icon = None, parent = None, text: str = None):
-        super().__init__(text, parent)
-        self._isPressed = False
-        self._block = False
-
-        self.timer = QtCore.QTimer()
-        self.timer.setInterval(time)
-        self.timer.timeout.connect(self.holdComplete)
-
-    def mousePressEvent(self, event: QtGui.QMouseEvent):
-        if event.button() != QtCore.Qt.MouseButton.LeftButton:
-            return
-        
-        self._isPressed = event
-        self.timer.start()
-        super().mousePressEvent(event)
-        
-    def mouseReleaseEvent(self, event: QtGui.QMouseEvent):
-        if event.button() != QtCore.Qt.MouseButton.LeftButton:
-            return
-                
-        self._isPressed = False
-        self.timer.stop()
-
-        if self._block:
-            self._block = False
-            return
-        
-        return super().mouseReleaseEvent(event)
-
-    def holdComplete(self):
-        if self._isPressed:
-            self.holded.emit(self._isPressed)
-        self._isPressed = False
-        self._block = True
-        

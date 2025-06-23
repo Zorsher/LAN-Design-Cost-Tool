@@ -11,7 +11,11 @@ class GetFilesWidget(QtWidgets.QWidget):
         self.file_denied.connect(self.add_file_denied)
         self.core_layout = QtWidgets.QVBoxLayout()
 
+
         self.label = QtWidgets.QLabel("Добавьте ваш файл")
+        f = QtGui.QFont()
+        f.setPointSize(20)
+        self.label.setFont(f)
         self.label.setObjectName("bold")
 
         self.add_file = PushButton("Добавить файл")

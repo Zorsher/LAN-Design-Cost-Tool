@@ -1,5 +1,5 @@
 from .App import Application
-from .Button import PushButton, HoldButton
+from .Button import PushButton
 from .Dialog import PopupDialog, MouseWidget
 from .ScrollArea import ScrollArea
 from .TextEdits import MessageInput, AreaInput

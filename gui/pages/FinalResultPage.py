@@ -131,7 +131,7 @@ class ResultsWidget(QtWidgets.QWidget):
 
             self.core_layout.addWidget(self.room_name_label)
 
-            sum_leight = 0
+            self.sum_leight = 0
 
             for paths in room.calculated_paths:
                 for item, leight in paths:
@@ -152,7 +152,7 @@ class ResultsWidget(QtWidgets.QWidget):
                         master_item_leight = math.ceil(master_item.distance*multiplier)
 
                         # print(f"{_l}*{multiplier}/100 = {leight}")
-                        sum_leight+=leight
+                        self.sum_leight+=leight
 
                         connection_items_layout = QtWidgets.QHBoxLayout()
 
@@ -196,13 +196,13 @@ class ResultsWidget(QtWidgets.QWidget):
 
                 self.core_layout.addLayout(connection_layout)
 
-            if sum_leight != 0:
-                sum_leight = math.ceil(sum_leight)
-                room.parent.full_leight+=sum_leight if room.status != 0 or room.status != 2 else 0
+            if self.sum_leight != 0:
+                self.sum_leight = math.ceil(self.sum_leight)
+                room.parent.full_leight+=self.sum_leight if room.status != 0 or room.status != 2 else 0
                 self.sum_leight_layout = QtWidgets.QHBoxLayout()
                 # self.sum_leight_label = QtWidgets.QLabel(f"{sum_leight}")
 
-                self.sum_leight_layout.addWidget(QtWidgets.QLabel(f"Общая длина всех путей внутри помещения: {sum_leight} м."))
+                self.sum_leight_layout.addWidget(QtWidgets.QLabel(f"Общая длина всех путей внутри помещения: {self.sum_leight} м."))
                 # self.sum_leight_layout.addWidget(self.sum_leight_label)
                 self.sum_leight_layout.addStretch()
                 self.core_layout.addLayout(self.sum_leight_layout)
@@ -300,6 +300,7 @@ class ResultsWidget(QtWidgets.QWidget):
             return
         
         overall_items = {}
+        self.sum_leight = 0
 
         self.stacked_layout.setCurrentIndex(1)
         for room in self.floor.rooms:
@@ -319,6 +320,7 @@ class ResultsWidget(QtWidgets.QWidget):
 
 
             room_results = ResultsWidget.RoomResults(room, self.multiplier)
+            self.sum_leight+=room_results.sum_leight
             self.scroll_area.addWidget(room_results)
 
         print(overall_items)
@@ -338,6 +340,22 @@ class ResultsWidget(QtWidgets.QWidget):
         self.items_cost.append(0)
         cost_items_layout.addLayout(cable_cost)
 
+        self.cable_channel_layout = QtWidgets.QHBoxLayout()
+        self.cable_channel_layout.addWidget(QtWidgets.QLabel(f"Длина кабель-канала {self.sum_leight} м. Цена за 2 метра -"))
+
+        self.cable_channel_cost = AreaInput()
+        self.cable_channel_cost.setPlaceholderText("10000")
+        self.cable_channel_cost.setFixedWidth(100)
+        self.cable_channel_cost.textChanged.connect(self.cable_channel_cost_changed)
+        self.cable_channel_layout.addWidget(self.cable_channel_cost)
+
+        self.cable_channel_layout.addWidget(QtWidgets.QLabel("Общая стоимость:"))
+        self.cable_channel_final_cost = QtWidgets.QLabel("0")
+        self.cable_channel_layout.addWidget(self.cable_channel_final_cost)
+        self.cable_channel_layout.addStretch()
+
+        self.cable_channel_layout.setContentsMargins(QtCore.QMargins(8, 0, 0, 0) + self.cable_channel_layout.contentsMargins())
+
         for index, data in enumerate(overall_items.items(), 1):
             item_id, count = data
             item = self.floor.tool.master_shapes[item_id]
@@ -346,6 +364,7 @@ class ResultsWidget(QtWidgets.QWidget):
             self.items_cost.append(0)
 
         self.final_cost_layout = QtWidgets.QHBoxLayout()
+        self.final_cost_layout.setContentsMargins(QtCore.QMargins(8, 0, 0, 0) + self.final_cost_layout.contentsMargins())
 
         self.final_cost = QtWidgets.QLabel("0")
         self.final_cost_with_percent = QtWidgets.QLabel("0")
@@ -359,6 +378,7 @@ class ResultsWidget(QtWidgets.QWidget):
         SignalHandler().cost_changed.connect(self.cost_changed)
 
         self.scroll_area.addWidget(final_leight_layout)
+        self.scroll_area.addWidget(self.cable_channel_layout)
         self.scroll_area.addWidget(cost_items_layout)
         self.scroll_area.addWidget(self.final_cost_layout)
 
@@ -368,3 +388,18 @@ class ResultsWidget(QtWidgets.QWidget):
 
         self.final_cost.setText(str(c))
         self.final_cost_with_percent.setText(str(math.ceil(c + (c*0.35))))
+
+    def cable_channel_cost_changed(self, text):
+        try:
+            cost = int(text)
+            if cost <= 0:
+                raise
+
+            self.cable_channel_cost.setObjectName("type1")
+            self.cable_channel_cost.style().polish(self.cable_channel_cost)
+            self.cable_channel_final_cost.setText(f"{math.ceil((self.sum_leight/2)*cost)}")
+
+        except:
+            self.cable_channel_cost.setObjectName("red")
+            self.cable_channel_cost.style().polish(self.cable_channel_final_cost)
+            return

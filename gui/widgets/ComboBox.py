@@ -48,12 +48,3 @@ class EnteredCombo(QtWidgets.QComboBox):
 
         view.moved.connect(self.mouse_moved.emit)
         view.entered.connect(self.entered.emit)
-
-
-
-
-        
-    
-    # def leaveEvent(self, event):
-    #     self.leave_event.emit(event)
-    #     return super().leaveEvent(event)
